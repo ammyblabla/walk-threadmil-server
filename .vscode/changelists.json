@@ -1,0 +1,23 @@
+{
+  "changelists": [
+    {
+      "name": "Default",
+      "files": [
+        "src/index.ts",
+        "src/services/gemini.ts",
+        "package-lock.json",
+        "package.json",
+        "src/config/supabase.ts",
+        "tsconfig.json",
+        ".DS_Store",
+        ".env.example",
+        "walk-client/mockup/index.html",
+        "walk-client/mockup/requirement/01-introduction.md",
+        "walk-client/mockup/requirement/02-frontend-requirement.md",
+        "walk-server/requirement/01-introduction.md",
+        "walk-server/requirement/02-frontend-requirement.md"
+      ]
+    }
+  ],
+  "active": "Default"
+}
