@@ -29,8 +29,6 @@ Originally I prompt to Gemini then it responses me the plan. After I workout I s
 - Show the plan as a clear step-by-step list of speed and incline by time, so I can set it manually
 - Accept a screenshot or a link from a workout result and use it as input for analysis
 - Preference resolution: session preferences override user preferences when they exist
-
-## Phase 1.5
 - Connect to Garmin Connect to import workout history
 
 ## Phase 2
