@@ -1,0 +1,8 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      ENV: local
+    # postgres service added with the data model
