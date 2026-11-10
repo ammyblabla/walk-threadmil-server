@@ -1,0 +1,26 @@
+from fastapi import FastAPI
+
+from app.api.v1 import home
+from app.config import get_settings
+
+API_PREFIX = "/api/v1"
+
+
+def create_app() -> FastAPI:
+    app = FastAPI(
+        title="Walk Treadmill API",
+        version="0.1.0",
+        openapi_url=f"{API_PREFIX}/openapi.json",
+        docs_url="/docs",
+    )
+
+    @app.get("/healthz", tags=["ops"])
+    def healthz() -> dict[str, str]:
+        settings = get_settings()
+        return {"status": "ok", "env": settings.env, "version": settings.git_sha}
+
+    app.include_router(home.router, prefix=API_PREFIX)
+    return app
+
+
+app = create_app()

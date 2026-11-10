@@ -31,7 +31,7 @@ Sources: `walk-treadmil-server/docs/requirement/01-introduction.md`, `walk-tread
                │ REST + OpenAPI (generated TS client)
                │ Firebase ID token (Bearer)
 ┌──────────────▼────────────────────────────┐
-│ Python 3.12 + FastAPI  (Docker)           │──── Google Cloud Run (free tier)
+│ Python 3.14 + FastAPI  (Docker)           │──── Google Cloud Run (free tier)
 │  api/ → services/ → planner/ (pure rules) │
 │  adapters/: garmin, llm                   │
 └───────┬──────────────────────┬────────────┘
@@ -44,7 +44,7 @@ Sources: `walk-treadmil-server/docs/requirement/01-introduction.md`, `walk-tread
 
 | Layer | Choice |
 |---|---|
-| Language/framework | **Python 3.12 + FastAPI**, Pydantic v2 |
+| Language/framework | **Python 3.14 + FastAPI**, Pydantic v2 |
 | ORM / migrations | SQLAlchemy 2.0 (or SQLModel) + Alembic |
 | Package manager | `uv` |
 | DB | **PostgreSQL**: Docker locally, **Neon** free tier in production |
