@@ -15,7 +15,7 @@ API for the treadmill workout planner. Python 3.14, FastAPI, deployed to Google 
 ```bash
 uv sync                      # creates .venv/ with Python 3.14 + deps
 cp .env.example .env         # DATABASE_URL for the local Postgres
-docker compose up -d db      # Postgres 17 on localhost:5432
+docker compose up -d db      # Postgres 18 on localhost:5432 (same major as Neon)
 uv run alembic upgrade head  # apply migrations
 uv run uvicorn app.main:app --reload --port 8080
 ```
