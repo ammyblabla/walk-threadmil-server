@@ -3,9 +3,14 @@
 This is a one-time setup. After it's done, **every push to `main` deploys automatically**.
 
 ```
-git push ─► GitHub Actions ─► test (ruff + pytest)
-                         └──► deploy: build image ─► Artifact Registry ─► Cloud Run ─► smoke test
+git push ─► GitHub Actions ─┬► test       (ruff + pytest)
+                            └► terraform  (fmt -check + validate, no GCP credentials)
+                                   │ both pass, on main
+                                   ▼
+                              deploy: build image ─► Artifact Registry ─► Cloud Run ─► smoke test
 ```
+
+Terraform **is not applied by CI**. CI only checks that the `.tf` files are formatted and valid. Run `terraform apply` from your machine (Step 3) whenever you change `infra/`.
 
 | Thing | Value |
 |---|---|
@@ -52,7 +57,15 @@ gcloud auth application-default set-quota-project walk-treadmil
 export GOOGLE_OAUTH_ACCESS_TOKEN="$(gcloud auth print-access-token)"   # valid ~1 hour
 ```
 
-## Step 2: Create the Terraform state bucket (once)
+## Step 2: Bootstrap the project (once)
+
+Terraform needs the Cloud Resource Manager API to read the project and set IAM before it can enable any other API, so enable that one by hand:
+
+```bash
+gcloud services enable cloudresourcemanager.googleapis.com --project=walk-treadmil
+```
+
+Then create the Terraform state bucket:
 
 ```bash
 gcloud storage buckets create gs://walk-treadmil-tfstate \

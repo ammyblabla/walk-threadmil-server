@@ -22,8 +22,23 @@ jobs:
       - run: uv run ruff format --check .
       - run: uv run pytest -q
 
+  # Static checks only — no GCP credentials. `terraform apply` runs locally (docs/deploy/cloud-run.md).
+  terraform:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/terraform
+    steps:
+      - uses: actions/checkout@v7
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "~1.17"
+      - run: terraform fmt -check -recursive
+      - run: terraform init -backend=false -input=false
+      - run: terraform validate
+
   deploy:
-    needs: test
+    needs: [test, terraform]
     # Skips (instead of failing) until the repo variables from `terraform output github_variables` are set.
     if: github.ref == 'refs/heads/main' && vars.WIF_PROVIDER != ''
     runs-on: ubuntu-latest
