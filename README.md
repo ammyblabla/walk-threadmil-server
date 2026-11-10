@@ -49,6 +49,16 @@ uv run pytest
 uv run ruff check . && uv run ruff format --check .
 ```
 
+## API requests (Bruno)
+
+`bruno/` is a [Bruno](https://www.usebruno.com) collection. Open the folder in the Bruno app and pick an environment: `local` (http://localhost:8080) or `dev` (Cloud Run). From the CLI:
+
+```bash
+cd bruno && npx @usebruno/cli run --env local
+```
+
+Add a `.bru` file here in the same commit as each new endpoint.
+
 ## Docker
 
 ```bash
@@ -68,5 +78,6 @@ app/
   api/v1/          routers (one file per resource)
   schemas/         Pydantic request/response models
 tests/
+bruno/             API request collection (local + dev environments)
 infra/terraform/   Cloud Run, Artifact Registry, GitHub deploy auth, budget
 ```
