@@ -29,56 +29,13 @@ resource "google_secret_manager_secret_iam_member" "runtime_db" {
   member    = "serviceAccount:${google_service_account.runtime.email}"
 }
 
-# ───────────── migrations: Cloud Run job, executed by CI before each deploy ─────────────
-resource "google_cloud_run_v2_job" "migrate" {
-  name                = "${var.service_name}-migrate"
-  location            = var.region
-  deletion_protection = false
-
-  template {
-    task_count = 1
-    template {
-      service_account = google_service_account.runtime.email
-      max_retries     = 0
-      timeout         = "300s"
-
-      containers {
-        # Placeholder; CI sets the same image it is about to deploy (see lifecycle).
-        image   = "us-docker.pkg.dev/cloudrun/container/hello"
-        command = ["alembic"]
-        args    = ["upgrade", "head"]
-
-        resources {
-          limits = {
-            cpu    = "1"
-            memory = "512Mi"
-          }
-        }
-
-        env {
-          name  = "ENV"
-          value = "prod"
-        }
-        env {
-          name = "DATABASE_URL" # direct (non-pooled) endpoint for DDL
-          value_source {
-            secret_key_ref {
-              secret  = google_secret_manager_secret.db["database-url-direct"].secret_id
-              version = "latest"
-            }
-          }
-        }
-      }
-    }
-  }
-
-  lifecycle {
-    ignore_changes = [
-      template[0].template[0].containers[0].image,
-      client,
-      client_version,
-    ]
-  }
-
-  depends_on = [google_project_service.apis, google_secret_manager_secret_iam_member.runtime_db]
+# ───────────── migrations: run by GitHub Actions before each deploy ─────────────
+# CI reads database-url-direct and runs `alembic upgrade head` on the runner (Actions logs show
+# the output). Only the deployer identity — reachable solely from main of this repo via WIF —
+# may read this one secret. (A Cloud Run job was used first; jobs in asia-southeast1 failed with
+# "exit code 0, Unknown error" and no logs, see docs/deploy/cloud-run.md.)
+resource "google_secret_manager_secret_iam_member" "deployer_db_direct" {
+  secret_id = google_secret_manager_secret.db["database-url-direct"].id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.deployer.email}"
 }
