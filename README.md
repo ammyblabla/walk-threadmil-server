@@ -11,7 +11,19 @@ API for the treadmill workout planner. Python 3.14, FastAPI, deployed to Google 
 
 ```bash
 uv sync                      # creates .venv/ with Python 3.14 + deps
+cp .env.example .env         # DATABASE_URL for the local Postgres
+docker compose up -d db      # Postgres 17 on localhost:5432
+uv run alembic upgrade head  # apply migrations
 uv run uvicorn app.main:app --reload --port 8080
+```
+
+Without Postgres the app still starts. `/health` and the mock `/home` work, endpoints that need the database return 503, and DB tests are skipped.
+
+New migration after changing `app/models/`:
+
+```bash
+uv run alembic revision --autogenerate -m "describe change"   # review the file, then:
+uv run alembic upgrade head
 ```
 
 You can also activate the venv and use plain commands:

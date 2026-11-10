@@ -8,6 +8,8 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen --no-dev
 COPY app ./app
+COPY alembic.ini ./
+COPY migrations ./migrations
 
 # ---- runtime: slim image, non-root ----
 FROM python:3.14-slim

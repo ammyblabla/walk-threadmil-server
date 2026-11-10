@@ -12,6 +12,19 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: walk
+          POSTGRES_PASSWORD: walk
+          POSTGRES_DB: walk
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U walk -d walk"
+          --health-interval 2s --health-timeout 3s --health-retries 15
+    env:
+      DATABASE_URL: postgresql+psycopg://walk:walk@localhost:5432/walk
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
