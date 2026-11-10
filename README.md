@@ -2,7 +2,7 @@
 
 API for the treadmill workout planner. Python 3.14, FastAPI, deployed to Google Cloud Run.
 
-- Design: [ADR-0001 tech stack](docs/adr/0001-tech-stack.md), [DB schema and REST API](docs/requirement/02-db-schema-and-api.md)
+- Design (in [walk-treadmil-shared](https://github.com/ammyblabla/walk-treadmil-shared)): [ADR-0001 tech stack](https://github.com/ammyblabla/walk-treadmil-shared/blob/main/docs/adr/0001-tech-stack.md), [DB schema and REST API](https://github.com/ammyblabla/walk-treadmil-shared/blob/main/docs/requirement/02-db-schema-and-api.md) ("spec 02" in code comments), [task list](https://github.com/ammyblabla/walk-treadmil-shared/blob/main/docs/task-list.md)
 - Deploy setup: [docs/deploy/cloud-run.md](docs/deploy/cloud-run.md)
 
 > **Status: MVP skeleton.**
