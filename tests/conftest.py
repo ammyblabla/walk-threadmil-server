@@ -4,15 +4,37 @@ DB tests need DATABASE_URL (CI sets it; locally: `docker compose up -d db` + .en
 Without it they are skipped, so `pytest` still works with no database.
 """
 
+import os
 from collections.abc import Iterator
 
 import pytest
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import Connection
+from sqlalchemy import Connection, create_engine, text
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
-from app.config import get_settings
+from app.config import Settings, get_settings
+
+
+def _use_isolated_test_database() -> None:
+    """Point the app at `<db>_test` so tests never touch dev data; create it if missing."""
+    url = Settings().database_url
+    if not url:
+        return
+    base = make_url(url)
+    test_name = base.database if base.database.endswith("_test") else f"{base.database}_test"
+    admin = create_engine(base.set(database="postgres"), isolation_level="AUTOCOMMIT")
+    with admin.connect() as conn:
+        exists = conn.scalar(text("select 1 from pg_database where datname = :n"), {"n": test_name})
+        if not exists:
+            conn.execute(text(f'create database "{test_name}"'))
+    admin.dispose()
+    os.environ["DATABASE_URL"] = base.set(database=test_name).render_as_string(hide_password=False)
+    get_settings.cache_clear()
+
+
+_use_isolated_test_database()
 
 
 def _require_db() -> None:

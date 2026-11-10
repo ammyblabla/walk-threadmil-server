@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from app.api.v1 import home
+from app.api.v1 import home, profile
 from app.config import get_settings
 
 API_PREFIX = "/api/v1"
@@ -21,6 +21,7 @@ def create_app() -> FastAPI:
         return {"status": "ok", "env": settings.env, "version": settings.git_sha}
 
     app.include_router(home.router, prefix=API_PREFIX)
+    app.include_router(profile.router, prefix=API_PREFIX)
     return app
 
 

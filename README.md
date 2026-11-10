@@ -5,7 +5,10 @@ API for the treadmill workout planner. Python 3.14, FastAPI, deployed to Google 
 - Design: [ADR-0001 tech stack](docs/adr/0001-tech-stack.md), [DB schema and REST API](docs/requirement/02-db-schema-and-api.md)
 - Deploy setup: [docs/deploy/cloud-run.md](docs/deploy/cloud-run.md)
 
-> **Status: MVP skeleton.** `GET /api/v1/home` returns **mock data**. There's no database, auth or planner yet.
+> **Status: MVP skeleton.**
+> - `GET /api/v1/home` returns **mock data**.
+> - `GET/PUT /api/v1/me/profile` is real and backed by Postgres, with computed HR zones. It uses a **dev-only user stub** until Firebase auth lands, and returns 401 in prod.
+> - Not built yet: production database (Neon), auth, planner.
 
 ## Run locally
 
