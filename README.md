@@ -7,8 +7,8 @@ API for the treadmill workout planner. Python 3.14, FastAPI, deployed to Google 
 
 > **Status: MVP skeleton.**
 > - `GET /api/v1/home` returns **mock data**.
-> - `GET/PUT /api/v1/me/profile` is real and backed by Postgres, with computed HR zones. It uses a **dev-only user stub** until Firebase auth lands, and returns 401 in prod.
-> - Not built yet: production database (Neon), auth, planner.
+> - `GET/PUT /api/v1/me/profile` is real and backed by Postgres, with computed HR zones. It requires a **Firebase ID token** (`Authorization: Bearer …`, project `walk-treadmil`). Locally, `AUTH_MODE=dev` skips auth and acts as one owner. Prod refuses that mode.
+> - Not built yet: planner.
 
 ## Run locally
 

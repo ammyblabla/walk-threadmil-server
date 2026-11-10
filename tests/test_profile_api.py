@@ -6,18 +6,42 @@ from sqlalchemy.orm import Session
 
 import app.auth
 import app.db
+import app.firebase_auth
 from app.config import Settings
 from app.db import get_session
 from app.main import app as fastapi_app
+from tests.test_firebase_auth import StaticKeys, make_token
 
 URL = "/api/v1/me/profile"
 
 
 @pytest.fixture
-def client(db_session: Session) -> Iterator[TestClient]:
+def db_client(db_session: Session) -> Iterator[TestClient]:
     fastapi_app.dependency_overrides[get_session] = lambda: db_session
     yield TestClient(fastapi_app)
     fastapi_app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def client(db_client: TestClient, monkeypatch: pytest.MonkeyPatch) -> TestClient:
+    """Dev auth: every request is the local owner."""
+    monkeypatch.setattr(app.auth, "get_settings", lambda: Settings(auth_mode="dev"))
+    return db_client
+
+
+@pytest.fixture
+def firebase_client(db_client: TestClient, monkeypatch: pytest.MonkeyPatch) -> TestClient:
+    """Firebase auth with test-signed tokens instead of Google's JWKS."""
+    monkeypatch.setattr(app.auth, "get_settings", lambda: Settings(auth_mode="firebase"))
+    monkeypatch.setattr(app.firebase_auth, "google_jwks", lambda: StaticKeys())
+    return db_client
+
+
+def _bearer(uid: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {make_token(sub=uid)}"}
+
+
+# ── profile behaviour (dev auth) ──
 
 
 def test_get_creates_profile_with_defaults(client: TestClient) -> None:
@@ -67,12 +91,38 @@ def test_put_rejects_invalid(client: TestClient, payload: dict) -> None:
     assert client.put(URL, json=payload).status_code == 422
 
 
-def test_prod_refuses_without_real_auth(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr(app.auth, "get_settings", lambda: Settings(env="prod"))
+# ── Firebase auth ──
 
-    assert client.get(URL).status_code == 401
+
+def test_firebase_requires_token(firebase_client: TestClient) -> None:
+    res = firebase_client.get(URL)
+
+    assert res.status_code == 401
+    assert res.headers["www-authenticate"] == "Bearer"
+
+
+def test_firebase_rejects_bad_token(firebase_client: TestClient) -> None:
+    res = firebase_client.get(URL, headers={"Authorization": "Bearer nope"})
+
+    assert res.status_code == 401
+
+
+def test_firebase_users_are_isolated(firebase_client: TestClient) -> None:
+    alice, bob = _bearer("uid-alice"), _bearer("uid-bob")
+
+    firebase_client.put(URL, json={"weight_kg": 55}, headers=alice)
+    firebase_client.put(URL, json={"weight_kg": 80}, headers=bob)
+
+    assert firebase_client.get(URL, headers=alice).json()["weight_kg"] == 55.0
+    assert firebase_client.get(URL, headers=bob).json()["weight_kg"] == 80.0
+
+
+# ── config guards ──
+
+
+def test_dev_auth_refused_in_prod() -> None:
+    with pytest.raises(ValueError, match="AUTH_MODE=dev"):
+        Settings(env="prod", auth_mode="dev")
 
 
 def test_returns_503_when_database_not_configured(monkeypatch: pytest.MonkeyPatch) -> None:

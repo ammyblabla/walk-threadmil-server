@@ -18,3 +18,4 @@ tfplan
 
 # Local env
 .env
+.neon
