@@ -49,6 +49,8 @@ resource "google_artifact_registry_repository" "api" {
 resource "google_service_account" "runtime" {
   account_id   = "walk-api-runtime"
   display_name = "walk-api Cloud Run runtime"
+
+  depends_on = [google_project_service.apis]
 }
 
 resource "google_cloud_run_v2_service" "api" {
@@ -134,6 +136,8 @@ resource "google_iam_workload_identity_pool_provider" "github" {
 resource "google_service_account" "deployer" {
   account_id   = "github-deployer"
   display_name = "GitHub Actions deployer"
+
+  depends_on = [google_project_service.apis]
 }
 
 resource "google_service_account_iam_member" "deployer_wif" {
