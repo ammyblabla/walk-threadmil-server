@@ -7,7 +7,7 @@ git push ─► GitHub Actions ─┬► test       (ruff + pytest)
                             └► terraform  (fmt -check + validate, no GCP credentials)
                                    │ both pass, on main
                                    ▼
-                              deploy: build image ─► Artifact Registry ─► Cloud Run ─► smoke test
+                              deploy: build image ─► Artifact Registry ─► migrate job ─► Cloud Run ─► smoke test
 ```
 
 Terraform **is not applied by CI**. CI only checks that the `.tf` files are formatted and valid. Run `terraform apply` from your machine (Step 3) whenever you change `infra/`.
@@ -19,6 +19,9 @@ Terraform **is not applied by CI**. CI only checks that the `.tf` files are form
 | Cloud Run service | `walk-api` |
 | Image repo | `asia-southeast1-docker.pkg.dev/walk-treadmil/walk/api` |
 | Terraform state | `gs://walk-treadmil-tfstate` (prefix `server`) |
+| Migration job | `walk-api-migrate` (Cloud Run job, `alembic upgrade head`) |
+| Database | Neon project `walk-treadmil` (`soft-wildflower-47108969`), `aws-ap-southeast-1`, Postgres 18, database and role `walk` |
+| Auth | Firebase Auth in project `walk-treadmil` (Google sign-in) |
 
 ## Who owns what
 
@@ -28,6 +31,7 @@ Terraform **is not applied by CI**. CI only checks that the `.tf` files are form
   - the service accounts
   - the keyless GitHub-to-GCP login (Workload Identity Federation)
   - the budget alert
+  - the Secret Manager *containers* for the database URLs, and the migration job
 - **GitHub Actions** only builds and deploys new **images**. Terraform ignores the image field, so the two never fight over it.
 
 ## Prerequisites (already done on this Mac)
@@ -114,6 +118,40 @@ terraform output -json github_variables | jq -r 'to_entries[] | "\(.key) \(.valu
   while read k v; do gh variable set "$k" --body "$v" --repo ammyblabla/walk-threadmil-server; done
 ```
 
+## Step 4b: Database (Neon) connection strings (once, or when the password rotates)
+
+Terraform creates the secrets `database-url` and `database-url-direct`, but **not their values**, so passwords never land in Terraform state. Add or rotate the values with the Neon CLI (`neon login` first):
+
+```bash
+P=soft-wildflower-47108969
+to_sqla() { sed -E 's#^postgres(ql)?://#postgresql+psycopg://#'; }
+
+# API: pooled endpoint (-pooler host)
+neon connection-string main --project-id $P --database-name walk --role-name walk --pooled | to_sqla |
+  tr -d '\n' | gcloud secrets versions add database-url --project walk-treadmil --data-file=-
+
+# Migrations: direct endpoint (DDL should not go through PgBouncer)
+neon connection-string main --project-id $P --database-name walk --role-name walk | to_sqla |
+  tr -d '\n' | gcloud secrets versions add database-url-direct --project walk-treadmil --data-file=-
+```
+
+Cloud Run reads `version = "latest"` when a revision starts, so **redeploy** (re-run the workflow) after rotating.
+
+On a brand-new project the order matters: a revision that references a secret with **no versions** fails to start. So:
+1. `terraform apply -target=google_secret_manager_secret.db -target=google_secret_manager_secret_iam_member.runtime_db`
+2. Add the values (above).
+3. `terraform apply`.
+
+### Migrations
+
+Every deploy runs `walk-api-migrate` with the **new image before** traffic switches. If a migration fails, the deploy stops and the old revision keeps serving. To run it by hand:
+
+```bash
+gcloud run jobs execute walk-api-migrate --region asia-southeast1 --wait
+```
+
+Write migrations to be **backward-compatible** (expand first, contract in a later deploy), because the old revision runs against the new schema for a moment.
+
 ## Step 5: Deploy
 
 Push to `main`, or open **Actions → ci → Run workflow**. Then check:
@@ -122,6 +160,7 @@ Push to `main`, or open **Actions → ci → Run workflow**. Then check:
 URL=$(terraform -chdir=infra/terraform output -raw service_url)
 curl "$URL/health"          # {"status":"ok","env":"prod","version":"<commit sha>"}
 curl "$URL/api/v1/home"
+curl -i "$URL/api/v1/me/profile"   # 401 without a Firebase ID token (503 would mean no DATABASE_URL)
 open "$URL/docs"
 ```
 
@@ -129,8 +168,9 @@ open "$URL/docs"
 
 - Only pushes to **`main` of `ammyblabla/walk-threadmil-server`** can get a deploy token. This is enforced by the identity provider's `attribute_condition`.
 - **The deployer** can only deploy to Cloud Run, push images to the `walk` repo, and run revisions as the runtime service account.
-- **The runtime service account** has **no** project roles. When secrets arrive (Neon URL, Firebase, Garmin key), grant it `secretAccessor` on each secret individually.
-- **The service is public** (`allUsers` invoker) because the app will enforce Firebase auth. Until then it only serves mock data.
+- **The runtime service account** has **no** project roles. It has `secretAccessor` only on `database-url` and `database-url-direct`. Grant new secrets (e.g. a Garmin token key) one at a time.
+- **The service is public** (`allUsers` invoker). Every data endpoint requires a valid **Firebase ID token** for project `walk-treadmil`. The app refuses `AUTH_MODE=dev` when `ENV=prod`.
+- **Database passwords** live only in Secret Manager and Neon. They aren't in Terraform state, GitHub, or the image.
 
 ## Cost
 
@@ -139,6 +179,8 @@ open "$URL/docs"
 | Cloud Run (request-based) | 2M requests, 180k vCPU-s, 360k GiB-s each month | Tiny. It scales to zero when idle |
 | Artifact Registry | 0.5 GB storage | About 5 images × ~80 MB compressed. A cleanup policy keeps the newest 5 |
 | Cloud Build | not used | Images are built on GitHub's runners |
+| Secret Manager | 6 active versions, 10k accesses each month | 2 secrets, read once per instance start |
+| Neon (free plan) | 0.5 GB storage, scale-to-zero compute | A few MB. The first query after idle takes about 0.5 s while compute wakes |
 
 A **budget alert of 50 THB a month** emails the billing admins at 50%, 90% and 100%. It only **alerts** and does not stop charges. Change it with `budget_amount` in `terraform.tfvars`.
 
@@ -160,4 +202,7 @@ gcloud storage rm -r gs://walk-treadmil-tfstate     # optional: the state bucket
 | `auth` step: *"unauthorized_client … attribute condition"* | You pushed from a branch other than `main`, or the repo was renamed. Update `github_repo` and re-apply |
 | `Permission 'iam.serviceAccounts.actAs' denied` | Re-run `terraform apply`. The `deployer_acts_as_runtime` binding is missing |
 | Budget resource fails: *"requires a quota project"* | `gcloud auth application-default set-quota-project walk-treadmil` |
+| Everything returns **500/503**, `terraform` says *"absent billing account"* | Billing was unlinked. Choosing Firebase's **Spark** plan does this. Re-link with `gcloud billing projects link walk-treadmil --billing-account 017D4D-232C81-E4897E` (Firebase then shows **Blaze**) |
+| Smoke test: `/me/profile` returns **503** | `DATABASE_URL` isn't wired: the secret has no version, or the service was created before it had one. Add the version and redeploy |
+| Migration job fails: *password authentication failed* | The Neon password was rotated. Update both secrets (Step 4b) |
 | Budget fails with *permission denied* | Your account needs **Billing Account Administrator** (or Costs Manager) on the billing account |

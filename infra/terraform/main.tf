@@ -7,6 +7,7 @@ locals {
     "sts.googleapis.com",
     "cloudresourcemanager.googleapis.com",
     "billingbudgets.googleapis.com",
+    "secretmanager.googleapis.com",
   ]
 
   image_repo = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.api.repository_id}"
@@ -84,6 +85,23 @@ resource "google_cloud_run_v2_service" "api" {
         name  = "ENV"
         value = "prod"
       }
+      env {
+        name  = "AUTH_MODE"
+        value = "firebase"
+      }
+      env {
+        name  = "FIREBASE_PROJECT_ID"
+        value = var.project_id
+      }
+      env {
+        name = "DATABASE_URL" # Neon pooled endpoint
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.db["database-url"].secret_id
+            version = "latest"
+          }
+        }
+      }
     }
   }
 
@@ -96,10 +114,10 @@ resource "google_cloud_run_v2_service" "api" {
     ]
   }
 
-  depends_on = [google_project_service.apis]
+  depends_on = [google_project_service.apis, google_secret_manager_secret_iam_member.runtime_db]
 }
 
-# Public API (auth is enforced in the app via Firebase tokens once added).
+# Public API: auth is enforced in the app (Firebase ID tokens).
 resource "google_cloud_run_v2_service_iam_member" "public" {
   name     = google_cloud_run_v2_service.api.name
   location = var.region

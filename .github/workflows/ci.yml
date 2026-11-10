@@ -77,6 +77,12 @@ jobs:
           docker build --build-arg GIT_SHA=${{ github.sha }} -t "$IMAGE" .
           docker push "$IMAGE"
 
+      # Migrate first with the new image; if it fails, the old revision keeps serving.
+      - name: Run database migrations
+        run: |
+          gcloud run jobs update "${{ vars.MIGRATE_JOB }}" --region "${{ vars.GCP_REGION }}" --image "$IMAGE" --quiet
+          gcloud run jobs execute "${{ vars.MIGRATE_JOB }}" --region "${{ vars.GCP_REGION }}" --wait
+
       - id: deploy
         uses: google-github-actions/deploy-cloudrun@v3
         with:
@@ -92,3 +98,7 @@ jobs:
           echo "$body"
           echo "$body" | grep -q '"version":"${{ github.sha }}"'
           curl -fsS "$url/api/v1/home" > /dev/null
+          # No token must give 401: 503 = DATABASE_URL not wired, 200 = auth disabled.
+          code=$(curl -s -o /dev/null -w "%{http_code}" "$url/api/v1/me/profile")
+          echo "/me/profile without token -> $code"
+          test "$code" = "401"
