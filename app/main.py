@@ -14,8 +14,9 @@ def create_app() -> FastAPI:
         docs_url="/docs",
     )
 
-    @app.get("/healthz", tags=["ops"])
-    def healthz() -> dict[str, str]:
+    # Not /healthz: Cloud Run's Google Front End reserves some paths ending in "z" and 404s them.
+    @app.get("/health", tags=["ops"])
+    def health() -> dict[str, str]:
         settings = get_settings()
         return {"status": "ok", "env": settings.env, "version": settings.git_sha}
 

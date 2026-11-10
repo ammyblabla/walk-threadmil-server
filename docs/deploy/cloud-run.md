@@ -120,7 +120,7 @@ Push to `main`, or open **Actions → ci → Run workflow**. Then check:
 
 ```bash
 URL=$(terraform -chdir=infra/terraform output -raw service_url)
-curl "$URL/healthz"          # {"status":"ok","env":"prod","version":"<commit sha>"}
+curl "$URL/health"          # {"status":"ok","env":"prod","version":"<commit sha>"}
 curl "$URL/api/v1/home"
 open "$URL/docs"
 ```
@@ -155,6 +155,7 @@ gcloud storage rm -r gs://walk-treadmil-tfstate     # optional: the state bucket
 
 | Symptom | Fix |
 |---|---|
+| Google-branded **404** on `/healthz` | Cloud Run reserves some paths ending in `z` on `*.run.app`. Use `/health` (already the case) |
 | Deploy job is **skipped** | The repo variables (Step 4) aren't set yet |
 | `auth` step: *"unauthorized_client … attribute condition"* | You pushed from a branch other than `main`, or the repo was renamed. Update `github_repo` and re-apply |
 | `Permission 'iam.serviceAccounts.actAs' denied` | Re-run `terraform apply`. The `deployer_acts_as_runtime` binding is missing |

@@ -23,7 +23,7 @@ pytest
 ```
 
 Then open:
-- http://localhost:8080/healthz
+- http://localhost:8080/health
 - http://localhost:8080/api/v1/home
 - http://localhost:8080/docs (Swagger UI) · OpenAPI JSON at `/api/v1/openapi.json`
 
@@ -48,7 +48,7 @@ Every push to `main` runs tests. If they pass, it builds the image, pushes it to
 
 ```
 app/
-  main.py          create_app(), /healthz, mounts /api/v1
+  main.py          create_app(), /health, mounts /api/v1
   config.py        settings from env vars
   api/v1/          routers (one file per resource)
   schemas/         Pydantic request/response models

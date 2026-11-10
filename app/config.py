@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     env: str = "local"
-    # Set by CI at deploy time so /healthz shows which commit is running.
+    # Set by CI at deploy time so /health shows which commit is running.
     git_sha: str = "dev"
 
 

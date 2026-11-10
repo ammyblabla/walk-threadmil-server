@@ -370,7 +370,7 @@ This is a pure function in `planner/hr_zones.py`, unit-tested, and never stored.
 ### 4.1 Conventions
 
 - **Base path:** `/api/v1`. OpenAPI is served at `/api/v1/openapi.json`. The TypeScript client is generated from it.
-- **Auth:** `Authorization: Bearer <Firebase ID token>` on every endpoint except `/healthz`.
+- **Auth:** `Authorization: Bearer <Firebase ID token>` on every endpoint except `/health`.
   - The first authenticated call creates the `users` row (just-in-time provisioning).
   - There is no `user_id` in any URL. Everything under the API belongs to the caller.
 - **JSON:** `snake_case`. Times use ISO-8601 UTC. Units are canonical (km/h, %, s, m).
@@ -387,7 +387,7 @@ This is a pure function in `planner/hr_zones.py`, unit-tested, and never stored.
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/healthz` | Liveness check (no auth) |
+| GET | `/health` | Liveness check (no auth) |
 | **Me** |||
 | GET | `/me` | User, profile, preferences, and integration status in one call |
 | PATCH | `/me` | Update `display_name` and `timezone` |
@@ -588,7 +588,7 @@ Plans can only be adjusted in the `planning` and `ready` states.
 **Monitoring:** basic and free.
 - Cloud Run's request logs and metrics.
 - Structured JSON logs carrying `user_id` and `request_id`, but never request bodies, because they contain health data.
-- `/healthz`.
+- `/health`.
 - Optionally Sentry's free tier, with PII scrubbing.
 
 **Testing hooks**

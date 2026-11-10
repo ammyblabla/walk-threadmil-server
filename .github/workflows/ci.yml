@@ -75,7 +75,7 @@ jobs:
       - name: Smoke test
         run: |
           url="${{ steps.deploy.outputs.url }}"
-          body=$(curl -fsS --retry 5 --retry-delay 3 "$url/healthz")
+          body=$(curl -fsS --retry 5 --retry-delay 3 "$url/health")
           echo "$body"
           echo "$body" | grep -q '"version":"${{ github.sha }}"'
           curl -fsS "$url/api/v1/home" > /dev/null

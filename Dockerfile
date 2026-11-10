@@ -14,7 +14,7 @@ FROM python:3.14-slim
 RUN useradd --create-home --uid 10001 api
 WORKDIR /app
 COPY --from=build --chown=api:api /app /app
-# Commit SHA baked in by CI (docker build --build-arg GIT_SHA=...), shown on /healthz.
+# Commit SHA baked in by CI (docker build --build-arg GIT_SHA=...), shown on /health.
 ARG GIT_SHA=dev
 ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1 PORT=8080 GIT_SHA=${GIT_SHA}
 USER api
