@@ -7,7 +7,7 @@ git push ─► GitHub Actions ─┬► test       (ruff + pytest)
                             └► terraform  (fmt -check + validate, no GCP credentials)
                                    │ both pass, on main
                                    ▼
-                              deploy: build image ─► Artifact Registry ─► migrate job ─► Cloud Run ─► smoke test
+                              deploy: build image ─► Artifact Registry ─► alembic upgrade (on runner) ─► Cloud Run ─► smoke test
 ```
 
 Terraform **is not applied by CI**. CI only checks that the `.tf` files are formatted and valid. Run `terraform apply` from your machine (Step 3) whenever you change `infra/`.
@@ -19,7 +19,7 @@ Terraform **is not applied by CI**. CI only checks that the `.tf` files are form
 | Cloud Run service | `walk-api` |
 | Image repo | `asia-southeast1-docker.pkg.dev/walk-treadmil/walk/api` |
 | Terraform state | `gs://walk-treadmil-tfstate` (prefix `server`) |
-| Migration job | `walk-api-migrate` (Cloud Run job, `alembic upgrade head`) |
+| Migrations | `alembic upgrade head`, run by GitHub Actions against Neon's direct endpoint |
 | Database | Neon project `walk-treadmil` (`soft-wildflower-47108969`), `aws-ap-southeast-1`, Postgres 18, database and role `walk` |
 | Auth | Firebase Auth in project `walk-treadmil` (Google sign-in) |
 
@@ -31,7 +31,7 @@ Terraform **is not applied by CI**. CI only checks that the `.tf` files are form
   - the service accounts
   - the keyless GitHub-to-GCP login (Workload Identity Federation)
   - the budget alert
-  - the Secret Manager *containers* for the database URLs, and the migration job
+  - the Secret Manager *containers* for the database URLs, and who may read them
 - **GitHub Actions** only builds and deploys new **images**. Terraform ignores the image field, so the two never fight over it.
 
 ## Prerequisites (already done on this Mac)
@@ -144,11 +144,18 @@ On a brand-new project the order matters: a revision that references a secret wi
 
 ### Migrations
 
-Every deploy runs `walk-api-migrate` with the **new image before** traffic switches. If a migration fails, the deploy stops and the old revision keeps serving. To run it by hand:
+Every deploy runs `alembic upgrade head` **on the GitHub runner, before** traffic switches. It uses `database-url-direct`, masked in the logs, and the output is in the Actions log. If a migration fails, the deploy stops and the old revision keeps serving.
+
+Only two identities can read `database-url-direct`: the runtime account and `github-deployer`. The deployer is reachable only from `main` of this repo, through Workload Identity Federation.
+
+To run it by hand from your Mac:
 
 ```bash
-gcloud run jobs execute walk-api-migrate --region asia-southeast1 --wait
+DATABASE_URL="$(gcloud secrets versions access latest --secret database-url-direct --project walk-treadmil)" \
+  uv run alembic upgrade head
 ```
+
+> **Why not a Cloud Run job?** We tried one first (`walk-api-migrate`, 2026-11-10). In `asia-southeast1`, every job execution, including Google's own sample image, failed with *"exit code 0, Unknown error"* and no logs, while the same job ran fine in `us-central1`. This started right after billing was briefly unlinked. Running on the runner avoids that dependency and gives readable logs.
 
 Write migrations to be **backward-compatible** (expand first, contract in a later deploy), because the old revision runs against the new schema for a moment.
 
@@ -204,5 +211,6 @@ gcloud storage rm -r gs://walk-treadmil-tfstate     # optional: the state bucket
 | Budget resource fails: *"requires a quota project"* | `gcloud auth application-default set-quota-project walk-treadmil` |
 | Everything returns **500/503**, `terraform` says *"absent billing account"* | Billing was unlinked. Choosing Firebase's **Spark** plan does this. Re-link with `gcloud billing projects link walk-treadmil --billing-account 017D4D-232C81-E4897E` (Firebase then shows **Blaze**) |
 | Smoke test: `/me/profile` returns **503** | `DATABASE_URL` isn't wired: the secret has no version, or the service was created before it had one. Add the version and redeploy |
-| Migration job fails: *password authentication failed* | The Neon password was rotated. Update both secrets (Step 4b) |
+| Migration step fails: *password authentication failed* | The Neon password was rotated. Update both secrets (Step 4b) |
+| Migration step fails: *Permission denied on secret* | The deployer lost `secretAccessor` on `database-url-direct`. Run `terraform apply` (`deployer_db_direct`) |
 | Budget fails with *permission denied* | Your account needs **Billing Account Administrator** (or Costs Manager) on the billing account |

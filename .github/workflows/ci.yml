@@ -77,11 +77,20 @@ jobs:
           docker build --build-arg GIT_SHA=${{ github.sha }} -t "$IMAGE" .
           docker push "$IMAGE"
 
-      # Migrate first with the new image; if it fails, the old revision keeps serving.
+      # Migrate before switching traffic; if it fails, the old revision keeps serving.
+      # Runs on the runner (output visible here) against Neon's direct, non-pooled endpoint.
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
       - name: Run database migrations
         run: |
-          gcloud run jobs update "${{ vars.MIGRATE_JOB }}" --region "${{ vars.GCP_REGION }}" --image "$IMAGE" --quiet
-          gcloud run jobs execute "${{ vars.MIGRATE_JOB }}" --region "${{ vars.GCP_REGION }}" --wait
+          DATABASE_URL="$(gcloud secrets versions access latest \
+            --secret database-url-direct --project "${{ vars.GCP_PROJECT_ID }}")"
+          echo "::add-mask::$DATABASE_URL"
+          export DATABASE_URL
+          uv sync --frozen --no-dev
+          uv run --no-sync alembic upgrade head
+          uv run --no-sync alembic current
 
       - id: deploy
         uses: google-github-actions/deploy-cloudrun@v3
