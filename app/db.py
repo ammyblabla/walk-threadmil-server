@@ -1,10 +1,11 @@
 """Database engine, declarative base and the FastAPI session dependency."""
 
 from collections.abc import Iterator
+from datetime import datetime
 from functools import lru_cache
 
 from fastapi import HTTPException, status
-from sqlalchemy import Engine, MetaData, create_engine
+from sqlalchemy import DateTime, Engine, MetaData, create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.config import get_settings
@@ -21,6 +22,8 @@ NAMING_CONVENTION = {
 
 class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
+    # Spec: timestamptz (UTC) everywhere.
+    type_annotation_map = {datetime: DateTime(timezone=True)}
 
 
 @lru_cache

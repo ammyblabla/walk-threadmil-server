@@ -32,6 +32,12 @@ filterwarnings = ["ignore:Using `httpx` with `starlette.testclient` is deprecate
 [tool.ruff]
 line-length = 100
 target-version = "py314"
+# Alembic-generated migration files keep its template style.
+extend-exclude = ["migrations/versions"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+# SQLAlchemy resolves relationship targets from string annotations; keep them quoted.
+"app/models/*" = ["UP037"]
